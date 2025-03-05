@@ -1,11 +1,10 @@
 /*!
- * Copyright ...
+ * (C) 2024, Staffbase GmbH
  */
-
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { BlockAttributes } from "widget-sdk";
 
-// 1) Helper to map codes to your 13 images
+// Single function that maps condition `code` -> one of your icons
 function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
 
   switch (code) {
@@ -88,15 +87,15 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
   }
 }
 
-// Utility function to format date/time as "Nov 26th, 9am"
+
+// Format date/time as "Nov 26th, 9am"
 function formatDateTime(date: Date): string {
-  const month = date.toLocaleString("en-US", { month: "short" }); // e.g. "Nov"
-  const day = date.getDate(); // e.g. 26
-  const hours = date.getHours() % 12 || 12; // convert to 12-hour
+  const month = date.toLocaleString("en-US", { month: "short" });
+  const day = date.getDate();
+  const hours = date.getHours() % 12 || 12;
   const minutes = date.getMinutes();
   const ampm = date.getHours() >= 12 ? "pm" : "am";
 
-  // Ordinal suffix helper (1st, 2nd, 3rd, 4th, etc.)
   const getOrdinalSuffix = (n: number): string => {
     if (n % 10 === 1 && n % 100 !== 11) return "st";
     if (n % 10 === 2 && n % 100 !== 12) return "nd";
@@ -105,7 +104,6 @@ function formatDateTime(date: Date): string {
   };
   const suffix = getOrdinalSuffix(day);
 
-  // If minutes are zero, show e.g. "9am" instead of "9:00am"
   const timeString =
     minutes === 0
       ? `${hours}${ampm}`
@@ -121,6 +119,7 @@ export interface WeatherTimeProps extends BlockAttributes {
 export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // State
   const [condition, setCondition] = useState<string>("Loading...");
   const [iconUrl, setIconUrl] = useState<string>("");
   const [temperatureC, setTemperatureC] = useState<number | null>(null);
@@ -133,85 +132,92 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   const defaultCondition = "Patchy light snow";
   const defaultTemperatureC = 27;
   const defaultTemperatureF = (27 * 9) / 5 + 32;
-  const defaultLocalTime = "12:00 PM";
+  // We'll use default.svg if we can't find a code
+  const defaultLocalIcon = "default.svg";
 
-// **Point to the new folder**
-const defaultLocalIcon = "/weather/default.svg";
+  // If your index.html is in `resources/`, and images are in `weather/`,
+  // you can use a relative path like `./weather`.
+  // On GitHub Pages, you might need something like `/weather-time/resources/weather`.
+  // Adjust as needed for your hosting structure:
+  const basePath = "./weather";
 
-const displayCity = city || defaultCity;
+  const displayCity = city || defaultCity;
 
-useEffect(() => {
-  const fetchWeatherAndTime = async () => {
-    try {
-      const apiKey = "2316f440769c440d92051647240512";
-      if (!apiKey) {
-        console.error("Weather API key is not set.");
-        return;
-      }
-
-      const response = await fetch(
-        `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(displayCity)}`
-      );
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-
-      const data = await response.json();
-      if (data && data.current && data.current.condition) {
-        // Condition text
-        setCondition(data.current.condition.text.toLowerCase());
-
-        // Temperature
-        setTemperatureC(data.current.temp_c);
-        setTemperatureF(data.current.temp_f);
-
-        // Fahrenheit vs Celsius logic
-        setIsFahrenheit(data.location?.country === "United States of America");
-
-        // **Use the WeatherAPI condition code directly**
-        const weatherCode = data.current.condition.code; // Example: 1003 for "Partly Cloudy"
-
-        // **Use WeatherAPI's `is_day` field for day/night detection**
-        const timeOfDay = data.current.is_day === 1 ? "day" : "night"; // 1 = day, 0 = night
-
-        // **Get the correct image filename from our mapping function**
-        const filename = getIconFilename(weatherCode, timeOfDay as "day" | "night");
-
-        // **Set the correct icon path**
-        setIconUrl(`/weather/${filename}`);
-
-        // **Set the static local time (no auto-update)**
-        if (data.location?.localtime) {
-          setLocalTime(new Date(data.location.localtime));
-        } else {
-          setLocalTime(null);
+  useEffect(() => {
+    const fetchWeatherAndTime = async () => {
+      try {
+        const apiKey = "2316f440769c440d92051647240512";
+        if (!apiKey) {
+          console.error("Weather API key is not set.");
+          return;
         }
-      } else {
-        throw new Error("Invalid data received from weather API");
+
+        const response = await fetch(
+          `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(displayCity)}`
+        );
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+
+        const data = await response.json();
+        if (data && data.current && data.current.condition) {
+          // Condition text
+          setCondition(data.current.condition.text.toLowerCase());
+
+          // Temperature
+          setTemperatureC(data.current.temp_c);
+          setTemperatureF(data.current.temp_f);
+
+          // Fahrenheit vs Celsius logic
+          setIsFahrenheit(data.location?.country === "United States of America");
+
+          // Use the WeatherAPI condition code
+          const weatherCode = data.current.condition.code || 1000;
+
+          // **Use WeatherAPI's `is_day` field for day/night detection**
+          const timeOfDay = data.current.is_day === 1 ? "day" : "night"; // 1 = day, 0 = night
+
+
+          // Get the correct image filename from the big switch
+          const filename = getIconFilename(weatherCode, timeOfDay as "day" | "night");
+
+          // Build final icon URL from `basePath`
+          setIconUrl(`${basePath}/${filename}`);
+
+          // Set local time (static, no auto-update)
+          if (data.location?.localtime) {
+            setLocalTime(new Date(data.location.localtime));
+          } else {
+            setLocalTime(null);
+          }
+        } else {
+          throw new Error("Invalid data received from weather API");
+        }
+      } catch (error) {
+        console.error("Error fetching weather data:", error);
+        // Fallback values
+        setCondition(defaultCondition.toLowerCase());
+        setTemperatureC(defaultTemperatureC);
+        setTemperatureF(defaultTemperatureF);
+        setLocalTime(null);
+        setIsFahrenheit(false);
+        setIconUrl(`${basePath}/${defaultLocalIcon}`);
       }
-    } catch (error) {
-      console.error("Error fetching weather data:", error);
-      // Fallback values
-      setCondition(defaultCondition.toLowerCase());
-      setTemperatureC(defaultTemperatureC);
-      setTemperatureF(defaultTemperatureF);
-      setLocalTime(null);
-      setIsFahrenheit(false);
-      setIconUrl(defaultLocalIcon);
-    }
+    };
+
+    fetchWeatherAndTime();
+  }, [displayCity]);
+
+  // Toggle units
+  const toggleTemperatureUnit = () => {
+    setIsFahrenheit((prev) => !prev);
   };
 
-  fetchWeatherAndTime();
-}, [displayCity]);
-
-const toggleTemperatureUnit = () => {
-  setIsFahrenheit((prev) => !prev);
-};
-
-const temperature = isFahrenheit ? temperatureF : temperatureC;
-const dateTimeString = localTime
-  ? formatDateTime(localTime)
-  : formatDateTime(new Date());
+  // Format temperature & time
+  const temperature = isFahrenheit ? temperatureF : temperatureC;
+  const dateTimeString = localTime
+    ? formatDateTime(localTime)
+    : formatDateTime(new Date());
 
   return (
     <div
@@ -235,7 +241,7 @@ const dateTimeString = localTime
               cursor: "pointer",
               fontSize: "32px",
               fontWeight: "bold",
-              margin: "0 0 10px 0"
+              margin: "0 0 10px 0",
             }}
           >
             {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
@@ -245,32 +251,23 @@ const dateTimeString = localTime
         <p style={{ fontSize: "16px", margin: "0 0 10px 0" }}>{dateTimeString}</p>
       </div>
 
-      {/* Right Column: Weather icon with onError fallback */}
+      {/* Right Column: Weather icon (with single fallback on error) */}
       {iconUrl && (
         <div
           style={{
             marginTop: "-20px",
             marginLeft: "20px",
             display: "flex",
-            alignItems: "center"
+            alignItems: "center",
           }}
         >
           <img
             src={iconUrl}
             alt="Weather Icon"
             style={{ width: "110px", marginTop: "-40px" }}
-            // <<--- onError is placed right in the <img> tag
             onError={(e) => {
-              const imgEl = e.currentTarget as HTMLImageElement;
-
-              // If "night-xxx.svg" 404s, fallback to "day-xxx.svg"
-              if (iconUrl.includes("night-")) {
-                const dayFallback = iconUrl.replace("night-", "day-");
-                imgEl.src = dayFallback;
-              } else {
-                // If day also fails, fallback to default.svg
-                imgEl.src = "/weather/default.svg";
-              }
+              // If the icon can't be loaded, fallback to `default.svg`
+              (e.currentTarget as HTMLImageElement).src = `${basePath}/${defaultLocalIcon}`;
             }}
           />
         </div>
