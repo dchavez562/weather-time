@@ -4,32 +4,33 @@
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { BlockAttributes } from "widget-sdk";
 
-// Single function that maps condition `code` -> one of your icons
+/**
+ * 1) Map WeatherAPI `code` + day/night =>  custom SVG filenames
+ */
 function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
-
   switch (code) {
-    // -- Clear / Sunny
+    // Clear / Sunny
     case 1000:
       return timeOfDay === "day" ? "sunny.svg" : "clear-moon.svg";
 
-    // -- Partly cloudy
+    // Partly cloudy
     case 1003:
       return timeOfDay === "day"
         ? "double-clouds.svg"
         : "partly-cloudy-moon.svg";
 
-    // -- Cloudy / Overcast
+    // Cloudy / Overcast
     case 1006:
     case 1009:
       return "cloudy.svg";
 
-    // -- Mist / Fog
+    // Mist / Fog
     case 1030:
     case 1135:
     case 1147:
       return "mist.svg";
 
-    // -- Drizzle
+    // Drizzle
     case 1063:
     case 1072:
     case 1150:
@@ -38,7 +39,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1171:
       return "drizzle.svg";
 
-    // -- Rain
+    // Rain
     case 1180:
     case 1183:
     case 1186:
@@ -52,7 +53,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1246:
       return "rain.svg";
 
-    // -- Snow / Sleet / Ice Pellets
+    // Snow / Sleet / Ice Pellets
     case 1066:
     case 1069:
     case 1114:
@@ -74,7 +75,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1264:
       return "snow.svg";
 
-    // -- Thunderstorm
+    // Thunderstorm
     case 1087:
     case 1273:
     case 1276:
@@ -82,16 +83,18 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1282:
       return "thunderstorm.svg";
 
+    // Anything else
     default:
       return "default.svg";
   }
 }
 
-
-// Format date/time as "Nov 26th, 9am"
+/**
+ * 2) Format date/time as "Nov 26th, 9am"
+ */
 function formatDateTime(date: Date): string {
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const day = date.getDate();
+  const month = date.toLocaleString("en-US", { month: "short" }); // e.g. "Nov"
+  const day = date.getDate(); // e.g. 26
   const hours = date.getHours() % 12 || 12;
   const minutes = date.getMinutes();
   const ampm = date.getHours() >= 12 ? "pm" : "am";
@@ -132,14 +135,16 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   const defaultCondition = "Patchy light snow";
   const defaultTemperatureC = 27;
   const defaultTemperatureF = (27 * 9) / 5 + 32;
-  // We'll use default.svg if we can't find a code
-  const defaultLocalIcon = "default.svg";
 
-  // If your index.html is in `resources/`, and images are in `weather/`,
-  // you can use a relative path like `./weather`.
-  // On GitHub Pages, you might need something like `/weather-time/resources/weather`.
-  // Adjust as needed for your hosting structure:
-  const basePath = "./weather";
+  // 3) For local dev, we can try a relative path first:
+  const LOCAL_BASE = "./weather";  // e.g. "weather/filename.svg" relative to your local index.html
+  // Then if that fails, we fallback to GH Pages:
+  // Adjust this to your actual GH Pages path:
+  const GITHUB_WEATHER_PATH = "https://eirastaffbase.github.io/weather-time/resources/weather";
+
+  // If you want a single "default.svg" on GH Pages:
+  // https://eirastaffbase.github.io/weather-time/resources/weather/default.svg
+  const fallbackGHDefault = `${GITHUB_WEATHER_PATH}/default.svg`;
 
   const displayCity = city || defaultCity;
 
@@ -161,30 +166,23 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
 
         const data = await response.json();
         if (data && data.current && data.current.condition) {
-          // Condition text
           setCondition(data.current.condition.text.toLowerCase());
 
-          // Temperature
           setTemperatureC(data.current.temp_c);
           setTemperatureF(data.current.temp_f);
 
-          // Fahrenheit vs Celsius logic
+          // Decide Fahrenheit vs Celsius
           setIsFahrenheit(data.location?.country === "United States of America");
 
-          // Use the WeatherAPI condition code
+          // Get code + is_day to pick correct icon
           const weatherCode = data.current.condition.code || 1000;
-
-          // **Use WeatherAPI's `is_day` field for day/night detection**
-          const timeOfDay = data.current.is_day === 1 ? "day" : "night"; // 1 = day, 0 = night
-
-
-          // Get the correct image filename from the big switch
+          const timeOfDay = data.current.is_day === 1 ? "day" : "night";
           const filename = getIconFilename(weatherCode, timeOfDay as "day" | "night");
 
-          // Build final icon URL from `basePath`
-          setIconUrl(`${basePath}/${filename}`);
+          // Start with local path
+          setIconUrl(`${LOCAL_BASE}/${filename}`);
 
-          // Set local time (static, no auto-update)
+          // Set a static local time
           if (data.location?.localtime) {
             setLocalTime(new Date(data.location.localtime));
           } else {
@@ -195,13 +193,16 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         }
       } catch (error) {
         console.error("Error fetching weather data:", error);
-        // Fallback values
+
+        // If the API call fails, fallback to defaults
         setCondition(defaultCondition.toLowerCase());
         setTemperatureC(defaultTemperatureC);
         setTemperatureF(defaultTemperatureF);
         setLocalTime(null);
         setIsFahrenheit(false);
-        setIconUrl(`${basePath}/${defaultLocalIcon}`);
+
+        // Just set local fallback by default:
+        setIconUrl(`${LOCAL_BASE}/default.svg`);
       }
     };
 
@@ -229,7 +230,7 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         justifyContent: "space-between",
         alignItems: "flex-start",
         padding: "10px",
-        position: "relative"
+        position: "relative",
       }}
     >
       {/* Left Column */}
@@ -247,11 +248,10 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
             {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
           </p>
         )}
-
         <p style={{ fontSize: "16px", margin: "0 0 10px 0" }}>{dateTimeString}</p>
       </div>
 
-      {/* Right Column: Weather icon (with single fallback on error) */}
+      {/* Right Column: Weather icon */}
       {iconUrl && (
         <div
           style={{
@@ -266,8 +266,25 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
             alt="Weather Icon"
             style={{ width: "110px", marginTop: "-40px" }}
             onError={(e) => {
-              // If the icon can't be loaded, fallback to `default.svg`
-              (e.currentTarget as HTMLImageElement).src = `${basePath}/${defaultLocalIcon}`;
+              const imgEl = e.currentTarget as HTMLImageElement;
+
+              // If we haven't tried GH fallback yet, do so:
+              if (!imgEl.dataset.fallback) {
+                imgEl.dataset.fallback = "true";
+                // Attempt to load the same filename from GH Pages
+                // e.g. "rain.svg" => "https://eirastaffbase.github.io/weather-time/resources/weather/rain.svg"
+                const filenameFromLocalPath = iconUrl.split("/").pop(); // "rain.svg", "cloudy.svg", etc.
+                imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
+              } 
+              else if (!imgEl.dataset.fallback2) {
+                // If GH also fails, do a final fallback to GH default.svg
+                imgEl.dataset.fallback2 = "true";
+                imgEl.src = fallbackGHDefault;
+              } 
+              else {
+                // If even that fails, just stop to avoid infinite loop
+                console.warn("All icon fallbacks failed. Stopping.");
+              }
             }}
           />
         </div>
