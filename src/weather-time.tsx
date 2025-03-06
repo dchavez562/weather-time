@@ -172,7 +172,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         const weatherCode = data.current.condition.code || 1000;
         const timeOfDay = data.current.is_day === 1 ? "day" : "night";
         const filename = getIconFilename(weatherCode, timeOfDay as "day" | "night");
-        setIconUrl(`${LOCAL_BASE}/${filename}`);
+        setIconUrl(`${GITHUB_WEATHER_PATH}/${filename}`);
 
         if (data.location?.localtime) {
           setLocalTime(new Date(data.location.localtime));
