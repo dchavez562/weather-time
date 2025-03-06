@@ -297,7 +297,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         <div
           style={{
             position: "absolute",
-            top: 0,
+            top:-20,
             left: 0,
             right: 0,
             bottom: 0,
@@ -306,14 +306,12 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             justifyContent: "center",
             alignItems: "center",
             zIndex: 10,
-            fontSize: "18px",
-            fontWeight: "bold",
           }}
         >
           <img
-            src={`${LOCAL_BASE}/loading.gif`}
+            src="https://eirastaffbase.github.io/weather-time/resources/img/loading.gif"
             alt="loading"
-            style={{ width: "14px", height: "14px" }}
+            style={{ width: "30px" }}
           />
         </div>
       )}
@@ -390,8 +388,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       {showPopup && (
         <div
           style={{
-            position: "fixed",
-            top: 0,
+            position: "absolute",
             left: 0,
             width: "100%",
             height: "100%",
