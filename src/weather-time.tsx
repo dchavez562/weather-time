@@ -293,7 +293,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         position: "relative",
       }}
     >
-            {isLoading && (
+      {/* {isLoading && (
         <div
           style={{
             position: "absolute",
@@ -314,7 +314,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             style={{ width: "30px" }}
           />
         </div>
-      )}
+      )} */}
 
       <div style={{ marginBottom: 0 }}>
         {temperature !== null && (
