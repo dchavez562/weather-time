@@ -221,7 +221,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       setTemperatureF(defaultTemperatureF);
       setLocalTime(new Date());
       setIsFahrenheit(false);
-      setIconUrl(`${LOCAL_BASE}/default.svg`);
+      setIconUrl(`${GITHUB_WEATHER_PATH}/default.svg`);
     } finally {
       setIsLoading(false); // done loading
     }
