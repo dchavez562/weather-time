@@ -8,6 +8,7 @@ import { BlockAttributes } from "widget-sdk";
  * Map WeatherAPI `code` + day/night => custom SVG filenames
  */
 function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
+  console.log(code);
   switch (code) {
     case 1000:
       return timeOfDay === "day" ? "sunny.svg" : "clear-moon.svg";
@@ -293,7 +294,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         position: "relative",
       }}
     >
-      {/* {isLoading && (
+      {isLoading && (
         <div
           style={{
             position: "absolute",
@@ -314,7 +315,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             style={{ width: "30px" }}
           />
         </div>
-      )} */}
+      )}
 
       <div style={{ marginBottom: 0 }}>
         {temperature !== null && (
