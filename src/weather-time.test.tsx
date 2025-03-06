@@ -5,7 +5,7 @@ import {WeatherTime} from "./weather-time";
 
 describe("WeatherTime", () => {
     it("should render the component", () => {
-        render(<WeatherTime contentLanguage="en_US" city="New York"/>);
+        render(<WeatherTime contentLanguage="en_US" city="New York" allowcityoverride="true"/>);
 
         expect(screen.getByText(/Hello World/)).toBeInTheDocument();
     })

@@ -12,10 +12,11 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1000:
       return timeOfDay === "day" ? "sunny.svg" : "clear-moon.svg";
     case 1003:
-      return timeOfDay === "day" ? "double-clouds.svg" : "partly-cloudy-moon.svg";
+      return timeOfDay === "day" ? "partly-cloudy-sun.svg" : "partly-cloudy-moon.svg";
     case 1006:
-    case 1009:
       return "cloudy.svg";
+    case 1009:
+      return "double-clouds.svg";      
     case 1030:
     case 1135:
     case 1147:
@@ -26,7 +27,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1153:
     case 1168:
     case 1171:
-      return "drizzle.svg";
+      return timeOfDay === "day" ? "drizzle.svg" : "drizzle-moon.svg";
     case 1180:
     case 1183:
     case 1186:
@@ -97,10 +98,15 @@ function formatDateTime(date: Date): string {
 
 export interface WeatherTimeProps extends BlockAttributes {
   city: string;
+  allowcityoverride: boolean; 
 }
 
-export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
+
+export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { city, allowcityoverride } = props;
+
+
 
   // State
   const [condition, setCondition] = useState<string>("Loading...");
@@ -109,6 +115,12 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   const [temperatureF, setTemperatureF] = useState<number | null>(null);
   const [isFahrenheit, setIsFahrenheit] = useState<boolean>(false);
   const [localTime, setLocalTime] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [overrideCity, setOverrideCity] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState<boolean>(false);
+  const [overrideInput, setOverrideInput] = useState<string>("");
+  const isCityOverrideAllowed = allowcityoverride === "true" ? true : allowcityoverride === "false" ? false : Boolean(allowcityoverride);
+
 
   // Defaults
   const defaultCity = "New York City";
@@ -117,16 +129,22 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   const defaultTemperatureF = (27 * 9) / 5 + 32;
 
   // Local dev path
-  const LOCAL_BASE = "./weather";
+  const LOCAL_BASE = "./img";
   // GH Pages fallback
   const GITHUB_WEATHER_PATH =
-    "https://eirastaffbase.github.io/weather-time/resources/weather";
+    "https://eirastaffbase.github.io/weather-time/resources/img";
   const fallbackGHDefault = `${GITHUB_WEATHER_PATH}/default.svg`;
 
-  const displayCity = city || defaultCity;
+  const displayCity = overrideCity || city || defaultCity;
+
+  const [cityName, setCity] = useState<string>(displayCity);
+  const [region, setRegion] = useState<string>("");
+  const [country, setCountry] = useState<string>("");
+
 
   // Fetch weather & time
   const fetchWeatherAndTime = async () => {
+    setIsLoading(true); // start loading
     try {
       const apiKey = "2316f440769c440d92051647240512";
       if (!apiKey) {
@@ -134,7 +152,6 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         return;
       }
 
-      // Fetch weather data
       const response = await fetch(
         `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(
           displayCity
@@ -144,6 +161,7 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         throw new Error("Network response was not ok");
       }
       const data = await response.json();
+
       if (data && data.current && data.current.condition) {
         setCondition(data.current.condition.text.toLowerCase());
         setTemperatureC(data.current.temp_c);
@@ -155,6 +173,18 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         const timeOfDay = data.current.is_day === 1 ? "day" : "night";
         const filename = getIconFilename(weatherCode, timeOfDay as "day" | "night");
         setIconUrl(`${LOCAL_BASE}/${filename}`);
+
+        if (data.location?.localtime) {
+          setLocalTime(new Date(data.location.localtime));
+        } else {
+          setLocalTime(new Date());
+        }
+
+        if (data.location) {
+          setCity(data.location.name);
+          setRegion(data.location.region);
+          setCountry(data.location.country);
+      }
 
         // Use the coordinates from the weather API to fetch the current time
         if (
@@ -192,8 +222,11 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
       setLocalTime(new Date());
       setIsFahrenheit(false);
       setIconUrl(`${LOCAL_BASE}/default.svg`);
+    } finally {
+      setIsLoading(false); // done loading
     }
   };
+
 
   useEffect(() => {
     fetchWeatherAndTime();
@@ -218,11 +251,11 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
     };
   }, [localTime]);
 
-  // Refresh weather data every 5 minutes to keep the API time in sync
+  // Refresh weather data every 10 minutes to keep the API time in sync
   useEffect(() => {
     const weatherInterval = setInterval(() => {
       fetchWeatherAndTime();
-    }, 300000); // 5 minutes
+    }, 600000); // 10 minutes
 
     return () => clearInterval(weatherInterval);
   }, []);
@@ -235,6 +268,11 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
   // Refresh on click (time, temp, or icon)
   const handleRefresh = () => {
     fetchWeatherAndTime();
+  };
+
+  const handleSetCityOverride = () => {
+    setOverrideCity(overrideInput.trim() || null);
+    setShowPopup(false);
   };
 
   const temperature = isFahrenheit ? temperatureF : temperatureC;
@@ -255,6 +293,31 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
         position: "relative",
       }}
     >
+            {isLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10,
+            fontSize: "18px",
+            fontWeight: "bold",
+          }}
+        >
+          <img
+            src={`${LOCAL_BASE}/loading.gif`}
+            alt="loading"
+            style={{ width: "14px", height: "14px" }}
+          />
+        </div>
+      )}
+
       <div style={{ marginBottom: 0 }}>
         {temperature !== null && (
           <p
@@ -290,7 +353,7 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
             src={iconUrl}
             onClick={handleRefresh}
             alt="Weather Icon"
-            style={{ width: "130px", marginTop: "-45px", marginLeft: "-7px" }}
+            style={{ width: "165px", marginTop: "-60px", marginLeft: "-5px" }}
             onError={(e) => {
               const imgEl = e.currentTarget as HTMLImageElement;
               if (!imgEl.dataset.fallback) {
@@ -305,8 +368,75 @@ export const WeatherTime = ({ city }: WeatherTimeProps): ReactElement => {
               }
             }}
           />
+      </div>
+      )}
+
+      {isCityOverrideAllowed && (
+        <div
+          onClick={() => setShowPopup(true)}
+          style={{
+            position: "absolute",
+            bottom: "5px",
+            right: "5px",
+            cursor: "pointer",
+            opacity: 0.5,
+          }}
+        >
+
+          <p>...</p>
         </div>
       )}
+
+      {showPopup && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "6px",
+              minWidth: "250px",
+            }}
+          >
+            <p>
+            <b>Current City: </b>
+            {cityName}
+            {region ? `, ${region}` : ""}
+            {country ? `, ${country}` : ""}
+            </p>
+
+            <input
+              type="text"
+              placeholder="Type a city..."
+              value={overrideInput}
+              onChange={(e) => setOverrideInput(e.target.value)}
+              style={{ width: "100%", marginBottom: "10px", marginTop: "10px" }}
+            />
+            <div>
+              <button
+                onClick={handleSetCityOverride}
+                style={{ marginBottom: "10px"}}
+              >
+                OK
+              </button>
+              <button onClick={() => setShowPopup(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

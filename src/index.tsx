@@ -25,6 +25,7 @@ import pkg from '../package.json'
  */
 const widgetAttributes: string[] = [
   'city',
+  'allowcityoverride',
 ];
 
 /**
@@ -33,7 +34,7 @@ const widgetAttributes: string[] = [
  */
 const factory: BlockFactory = (BaseBlockClass, _widgetApi) => {
   /**
-   *  <weather-time city="New York"></weather-time>
+   *  <weather-time city="New York" allowcityoverride="true"></weather-time>
    */
   return class WeatherTimeBlock extends BaseBlockClass implements BaseBlock {
     private _root: ReactDOM.Root | null = null;

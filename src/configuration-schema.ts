@@ -23,6 +23,12 @@ export const configurationSchema: JSONSchema7 = {
     city: {
       type: 'string',
       title: 'City',
+      default: '{{user.profile.location}}',
+    },
+    allowcityoverride: {
+      type: "boolean",
+      title: "Allow city override?",
+      default: true,
     },
   },
   required: ['city'],
@@ -34,6 +40,11 @@ export const configurationSchema: JSONSchema7 = {
  */
 export const uiSchema: UiSchema = {
   city: {
-    'ui:help': 'Enter the city name in order to view weather & time.',
+    'ui:help': 'Enter the city name, or use {{user.profile.location}} to pull from the user.',
   },
+  allowcityoverride: {
+    "ui:help":
+      "If checked, a small button in the widget will let the user override the city.",
+  },
+
 };
