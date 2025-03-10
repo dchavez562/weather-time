@@ -155,8 +155,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const [country, setCountry] = useState<string>("");
 
   // Fetch weather & time
-  const fetchWeatherAndTime = async () => {
-    setIsLoading(true); // start loading
+  const fetchWeatherData = async () => {
     try {
       const apiKey = "2316f440769c440d92051647240512";
       if (!apiKey) {
@@ -180,7 +179,6 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         setTemperatureF(data.current.temp_f);
         setIsFahrenheit(data.location?.country === "United States of America");
 
-        // Get correct icon
         const weatherCode = data.current.condition.code || 1000;
         const timeOfDay = data.current.is_day === 1 ? "day" : "night";
         const filename = getIconFilename(weatherCode, timeOfDay);
@@ -198,31 +196,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
           setCountry(data.location.country);
         }
 
-        // Use the coordinates from the weather API to fetch the current time
-        if (
-          data.location &&
-          data.location.lat != null &&
-          data.location.lon != null
-        ) {
-          const { lat, lon } = data.location;
-          const timeResponse = await fetch(
-            `https://timeapi.io/api/Time/current/coordinate?latitude=${encodeURIComponent(
-              lat
-            )}&longitude=${encodeURIComponent(lon)}`
-          );
-          if (timeResponse.ok) {
-            const timeData = await timeResponse.json();
-            if (timeData.dateTime) {
-              setLocalTime(new Date(timeData.dateTime));
-            } else {
-              setLocalTime(new Date());
-            }
-          } else {
-            setLocalTime(new Date());
-          }
-        } else {
-          setLocalTime(new Date());
-        }
+        return data.location; // return location data for time fetch
       } else {
         throw new Error("Invalid data received from weather API");
       }
@@ -231,12 +205,43 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       setCondition(defaultCondition.toLowerCase());
       setTemperatureC(defaultTemperatureC);
       setTemperatureF(defaultTemperatureF);
-      setLocalTime(new Date());
       setIsFahrenheit(false);
       setIconUrl(`${GITHUB_WEATHER_PATH}/default.svg`);
-    } finally {
-      setIsLoading(false); // done loading
+      return null; // return null if weather fetch fails
     }
+  };
+
+  const fetchTimeData = async (locationData: any) => {
+    if (!locationData || isMobileView) return; // Do not fetch if location or mobile
+
+    try {
+      const { lat, lon } = locationData;
+      const timeResponse = await fetch(
+        `https://timeapi.io/api/Time/current/coordinate?latitude=${encodeURIComponent(
+          lat
+        )}&longitude=${encodeURIComponent(lon)}`
+      );
+      if (timeResponse.ok) {
+        const timeData = await timeResponse.json();
+        if (timeData.dateTime) {
+          setLocalTime(new Date(timeData.dateTime));
+        } else {
+          setLocalTime(new Date());
+        }
+      } else {
+        setLocalTime(new Date());
+      }
+    } catch (error) {
+      console.error("Error fetching time data:", error);
+      setLocalTime(new Date()); // fallback to local time, but do not set weather to defaults
+    }
+  };
+
+  const fetchWeatherAndTime = async () => {
+    setIsLoading(true);
+    const locationData = await fetchWeatherData();
+    await fetchTimeData(locationData);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -315,7 +320,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(255,255,255,0.7)",
+            backgroundColor: isMobileView ? "rgba(255,255,255,0)" : "rgba(255,255,255,0.7)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -342,7 +347,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
               <img
                 src={iconUrl}
                 alt="Weather Icon"
-                style={{ width: "165px" }}
+                style={{ width: "105px" }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
                   if (!imgEl.dataset.fallback) {
@@ -366,9 +371,9 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
               onClick={toggleTemperatureUnit}
               style={{
                 cursor: "pointer",
-                fontSize: "32px",
-                fontWeight: "bold",
-                margin: "0px 20px 0px 0px",
+                fontSize: "26px",
+                fontWeight: "600",
+                margin: "0px 15px 0px 0px",
               }}
             >
               {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
