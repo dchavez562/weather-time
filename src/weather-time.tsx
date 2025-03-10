@@ -8,7 +8,6 @@ import { BlockAttributes } from "widget-sdk";
  * Map WeatherAPI `code` + day/night => custom SVG filenames
  */
 function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
-  console.log(code);
   switch (code) {
     case 1000:
       return timeOfDay === "day" ? "sunny.svg" : "clear-moon.svg";
@@ -17,7 +16,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1006:
       return "cloudy.svg";
     case 1009:
-      return "double-clouds.svg";      
+      return "double-clouds.svg";
     case 1030:
     case 1135:
     case 1147:
@@ -73,14 +72,13 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
 }
 
 /**
- * Format date/time as "Nov 26th, 9:05:23am"
+ * Format date/time as "Nov 26th, 9:05am"
  */
 function formatDateTime(date: Date): string {
   const month = date.toLocaleString("en-US", { month: "short" });
   const day = date.getDate();
   const hours = date.getHours() % 12 || 12;
   const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
   const ampm = date.getHours() >= 12 ? "pm" : "am";
 
   const getOrdinalSuffix = (n: number): string => {
@@ -91,23 +89,18 @@ function formatDateTime(date: Date): string {
   };
   const suffix = getOrdinalSuffix(day);
 
-  const timeString = `${hours}:${minutes.toString().padStart(2, "0")}${ampm}`;
-
-
-  return `${month} ${day}${suffix}, ${timeString}`;
+  return `${month} ${day}${suffix}, ${hours}:${minutes.toString().padStart(2, "0")}${ampm}`;
 }
 
 export interface WeatherTimeProps extends BlockAttributes {
   city: string;
-  allowcityoverride: boolean; 
+  allowcityoverride: boolean;
 }
-
 
 export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
+
   const { city, allowcityoverride } = props;
-
-
 
   // State
   const [condition, setCondition] = useState<string>("Loading...");
@@ -120,8 +113,11 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const [overrideCity, setOverrideCity] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState<boolean>(false);
   const [overrideInput, setOverrideInput] = useState<string>("");
-  const isCityOverrideAllowed = allowcityoverride === "true" ? true : allowcityoverride === "false" ? false : Boolean(allowcityoverride);
+  const isCityOverrideAllowed =
+    allowcityoverride === "true" ? true : allowcityoverride === "false" ? false : Boolean(allowcityoverride);
 
+  // Layout-related state
+  const [isSmallWidget, setIsSmallWidget] = useState(false);
 
   // Defaults
   const defaultCity = "New York City";
@@ -132,18 +128,41 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   // Local dev path
   const LOCAL_BASE = "./img";
   // GH Pages fallback
-  const GITHUB_WEATHER_PATH =
-    "https://eirastaffbase.github.io/weather-time/resources/img";
+  const GITHUB_WEATHER_PATH = "https://eirastaffbase.github.io/weather-time/resources/img";
   const fallbackGHDefault = `${GITHUB_WEATHER_PATH}/default.svg`;
 
+  // City display
   const displayCity = overrideCity || city || defaultCity;
 
   const [cityName, setCity] = useState<string>(displayCity);
   const [region, setRegion] = useState<string>("");
   const [country, setCountry] = useState<string>("");
 
+  // ======== Handle widget width to switch layout ========
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-  // Fetch weather & time
+    const handleResize = () => {
+      if (containerRef.current) {
+        setIsSmallWidget(containerRef.current.offsetWidth < 200);
+      }
+    };
+
+    // Observe container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(containerRef.current);
+
+    // Do an initial size check
+    handleResize();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // ======== Fetch weather & time ========
   const fetchWeatherAndTime = async () => {
     setIsLoading(true); // start loading
     try {
@@ -154,9 +173,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       }
 
       const response = await fetch(
-        `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(
-          displayCity
-        )}`
+        `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(displayCity)}`
       );
       if (!response.ok) {
         throw new Error("Network response was not ok");
@@ -185,19 +202,15 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
           setCity(data.location.name);
           setRegion(data.location.region);
           setCountry(data.location.country);
-      }
+        }
 
         // Use the coordinates from the weather API to fetch the current time
-        if (
-          data.location &&
-          data.location.lat != null &&
-          data.location.lon != null
-        ) {
+        if (data.location && data.location.lat != null && data.location.lon != null) {
           const { lat, lon } = data.location;
           const timeResponse = await fetch(
-            `https://timeapi.io/api/Time/current/coordinate?latitude=${encodeURIComponent(
-              lat
-            )}&longitude=${encodeURIComponent(lon)}`
+            `https://timeapi.io/api/Time/current/coordinate?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(
+              lon
+            )}`
           );
           if (timeResponse.ok) {
             const timeData = await timeResponse.json();
@@ -228,12 +241,11 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
     }
   };
 
-
   useEffect(() => {
     fetchWeatherAndTime();
   }, [displayCity]);
 
-  // Start the live clock only once when localTime is set
+  // Start live clock once localTime is set
   const clockStartedRef = useRef(false);
   useEffect(() => {
     if (!localTime || clockStartedRef.current) return;
@@ -252,44 +264,44 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
     };
   }, [localTime]);
 
-  // Refresh weather data every 10 minutes to keep the API time in sync
+  // Refresh weather data every 10 minutes
   useEffect(() => {
     const weatherInterval = setInterval(() => {
       fetchWeatherAndTime();
-    }, 600000); // 10 minutes
+    }, 600_000); // 10 minutes
 
     return () => clearInterval(weatherInterval);
   }, []);
 
-  // Toggle temperature
+  // Toggles temperature unit
   const toggleTemperatureUnit = () => {
     setIsFahrenheit((prev) => !prev);
   };
 
-  // Refresh on click (time, temp, or icon)
+  // Refresh on click
   const handleRefresh = () => {
     fetchWeatherAndTime();
   };
 
+  // Popup city override
   const handleSetCityOverride = () => {
     setOverrideCity(overrideInput.trim() || null);
     setShowPopup(false);
   };
 
   const temperature = isFahrenheit ? temperatureF : temperatureC;
-  const dateTimeString = localTime
-    ? formatDateTime(localTime)
-    : formatDateTime(new Date());
+  const dateTimeString = localTime ? formatDateTime(localTime) : formatDateTime(new Date());
 
   return (
     <div
       ref={containerRef}
       style={{
+        // Use flex but dynamically switch direction/alignment
         display: "flex",
-        flexDirection: "row",
+        flexDirection: isSmallWidget ? "column" : "row",
         flexWrap: "nowrap",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
+        justifyContent: isSmallWidget ? "flex-end" : "space-between",
+        alignItems: isSmallWidget ? "flex-end" : "flex-start",
         padding: "10px",
         position: "relative",
       }}
@@ -298,7 +310,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         <div
           style={{
             position: "absolute",
-            top:-20,
+            top: -20,
             left: 0,
             right: 0,
             bottom: 0,
@@ -317,57 +329,107 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </div>
       )}
 
-      <div style={{ marginBottom: 0 }}>
-        {temperature !== null && (
-          <p
-            onClick={toggleTemperatureUnit}
-            style={{
-              cursor: "pointer",
-              fontSize: "32px",
-              fontWeight: "bold",
-              margin: "0 0 10px 0",
-            }}
-          >
-            {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
-          </p>
-        )}
-        <p
-          onClick={handleRefresh}
-          style={{ fontSize: "16px", margin: "0 0 10px 0" }}
-        >
-          {dateTimeString}
-        </p>
-      </div>
+      {/** 
+       * ------ SMALLEST LAYOUT -------
+       * Hide date, stack temp under image, right-align.
+       */}
+      {isSmallWidget ? (
+        <React.Fragment>
+          {/* Icon on top */}
+          {iconUrl && (
+            <img
+              src={iconUrl}
+              onClick={handleRefresh}
+              alt="Weather Icon"
+              style={{ width: "80px", marginBottom: "10px", cursor: "pointer" }}
+              onError={(e) => {
+                const imgEl = e.currentTarget as HTMLImageElement;
+                if (!imgEl.dataset.fallback) {
+                  imgEl.dataset.fallback = "true";
+                  const filenameFromLocalPath = iconUrl.split("/").pop();
+                  imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
+                } else if (!imgEl.dataset.fallback2) {
+                  imgEl.dataset.fallback2 = "true";
+                  imgEl.src = fallbackGHDefault;
+                } else {
+                  console.warn("All icon fallbacks failed. Stopping.");
+                }
+              }}
+            />
+          )}
 
-      {iconUrl && (
-        <div
-          style={{
-            marginTop: "-20px",
-            marginLeft: "20px",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <img
-            src={iconUrl}
-            onClick={handleRefresh}
-            alt="Weather Icon"
-            style={{ width: "165px", marginTop: "-60px", marginLeft: "-5px" }}
-            onError={(e) => {
-              const imgEl = e.currentTarget as HTMLImageElement;
-              if (!imgEl.dataset.fallback) {
-                imgEl.dataset.fallback = "true";
-                const filenameFromLocalPath = iconUrl.split("/").pop();
-                imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
-              } else if (!imgEl.dataset.fallback2) {
-                imgEl.dataset.fallback2 = "true";
-                imgEl.src = fallbackGHDefault;
-              } else {
-                console.warn("All icon fallbacks failed. Stopping.");
-              }
-            }}
-          />
-      </div>
+          {/* Temp below icon */}
+          {temperature !== null && (
+            <p
+              onClick={toggleTemperatureUnit}
+              style={{
+                cursor: "pointer",
+                fontSize: "24px",
+                fontWeight: "bold",
+                margin: "0",
+              }}
+            >
+              {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
+            </p>
+          )}
+          {/* Date is hidden in this layout */}
+        </React.Fragment>
+      ) : (
+        /** 
+         * ------ NORMAL LAYOUT ( >= 300px ) ------ 
+         * Show date, place temp/date at left, icon at right. 
+         */
+        <>
+          <div style={{ marginBottom: 0 }}>
+            {temperature !== null && (
+              <p
+                onClick={toggleTemperatureUnit}
+                style={{
+                  cursor: "pointer",
+                  fontSize: "32px",
+                  fontWeight: "bold",
+                  margin: "0 0 10px 0",
+                }}
+              >
+                {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
+              </p>
+            )}
+            <p onClick={handleRefresh} style={{ fontSize: "16px", margin: "0 0 10px 0" }}>
+              {dateTimeString}
+            </p>
+          </div>
+
+          {iconUrl && (
+            <div
+              style={{
+                marginTop: "-20px",
+                marginLeft: "20px",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <img
+                src={iconUrl}
+                onClick={handleRefresh}
+                alt="Weather Icon"
+                style={{ width: "165px", marginTop: "-60px", marginLeft: "-5px", cursor: "pointer" }}
+                onError={(e) => {
+                  const imgEl = e.currentTarget as HTMLImageElement;
+                  if (!imgEl.dataset.fallback) {
+                    imgEl.dataset.fallback = "true";
+                    const filenameFromLocalPath = iconUrl.split("/").pop();
+                    imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
+                  } else if (!imgEl.dataset.fallback2) {
+                    imgEl.dataset.fallback2 = "true";
+                    imgEl.src = fallbackGHDefault;
+                  } else {
+                    console.warn("All icon fallbacks failed. Stopping.");
+                  }
+                }}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {isCityOverrideAllowed && (
@@ -381,7 +443,6 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             opacity: 0.5,
           }}
         >
-
           <p>...</p>
         </div>
       )}
@@ -409,10 +470,10 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             }}
           >
             <p>
-            <b>Current City: </b>
-            {cityName}
-            {region ? `, ${region}` : ""}
-            {country ? `, ${country}` : ""}
+              <b>Current City: </b>
+              {cityName}
+              {region ? `, ${region}` : ""}
+              {country ? `, ${country}` : ""}
             </p>
 
             <input
@@ -423,10 +484,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
               style={{ width: "100%", marginBottom: "10px", marginTop: "10px" }}
             />
             <div>
-              <button
-                onClick={handleSetCityOverride}
-                style={{ marginBottom: "10px"}}
-              >
+              <button onClick={handleSetCityOverride} style={{ marginBottom: "10px" }}>
                 OK
               </button>
               <button onClick={() => setShowPopup(false)}>Cancel</button>
@@ -434,7 +492,6 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
