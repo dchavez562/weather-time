@@ -30,6 +30,11 @@ export const configurationSchema: JSONSchema7 = {
       title: "Allow city override?",
       default: true,
     },
+    mobileview: {
+      type: "boolean",
+      title: "Mobile view",
+      default: false,
+    }
   },
   required: ['city'],
 };
@@ -45,6 +50,10 @@ export const uiSchema: UiSchema = {
   allowcityoverride: {
     "ui:help":
       "If checked, a small button in the widget will let the user override the city.",
+  },
+  mobileview: {
+    "ui:help":
+      "Hide the date and time to simplify the widget for mobile.",
   },
 
 };
