@@ -10,11 +10,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { BlockAttributes } from "widget-sdk";
+import { DateTime } from "luxon";
 
 /**
  * Map WeatherAPI `code` + day/night => custom SVG filenames
+ * ------------------------------------------------------------------------
+ * WeatherAPI returns a numeric `code` for the condition (e.g., 1000 for "Clear"),
+ * plus an indication of day or night. This function maps those to the custom
+ * SVG filename that should be displayed in the UI.
  */
 function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
   switch (code) {
@@ -81,42 +87,74 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
 }
 
 /**
- * Format date/time as "Nov 26th, 9:05am"
+ * Format a Luxon DateTime object into a short string, e.g.:
+ * "Nov 26th, 9:05am"
  */
-function formatDateTime(date: Date): string {
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const day = date.getDate();
-  const hours = date.getHours() % 12 || 12;
-  const minutes = date.getMinutes();
-  const ampm = date.getHours() >= 12 ? "pm" : "am";
+function formatDateTime(dt: DateTime): string {
+  // Example: dt.toFormat("LLL") => short month name like "Nov"
+  const monthShort = dt.toFormat("LLL"); 
+  // The numeric day of the month, e.g. 26
+  const day = dt.day; 
+  // 24-hour value; we'll convert to 12-hour below.
+  const hours24 = dt.hour; 
+  // Convert to 12-hour format (1-12)
+  const hours12 = hours24 % 12 || 12; 
+  // Get the minutes
+  const minutes = dt.minute; 
+  // AM/PM check
+  const ampm = hours24 >= 12 ? "pm" : "am"; 
 
-  const getOrdinalSuffix = (n: number): string => {
+  // For ordinal suffix (st, nd, rd, th),
+  // e.g. 1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc.
+  function getOrdinalSuffix(n: number): string {
     if (n % 10 === 1 && n % 100 !== 11) return "st";
     if (n % 10 === 2 && n % 100 !== 12) return "nd";
     if (n % 10 === 3 && n % 100 !== 13) return "rd";
     return "th";
-  };
+  }
   const suffix = getOrdinalSuffix(day);
 
-  const timeString = `${hours}:${minutes.toString().padStart(2, "0")}${ampm}`;
-  return `${month} ${day}${suffix}, ${timeString}`;
+  // Pad minutes to 2 digits (e.g., "05" if it's 5 minutes after the hour)
+  const minStr = minutes.toString().padStart(2, "0");
+
+  // Build up the final string, e.g. "Nov 26th, 9:05am"
+  return `${monthShort} ${day}${suffix}, ${hours12}:${minStr}${ampm}`;
 }
 
+/**
+ * The React component properties
+ */
 export interface WeatherTimeProps extends BlockAttributes {
-  city: string;
+  city: string;              // The city for which to display weather/time
   allowcityoverride: boolean; 
   mobileview: boolean;
 }
 
+/**
+ * Main WeatherTime component
+ * ------------------------------------------------------------------------
+ * 1) Fetch weather data from WeatherAPI (including the `tz_id` for local time).
+ * 2) Use Luxon to get the current time in that tz_id.
+ * 3) Render the temperature, condition, and time.
+ * 4) (Optional) allow user to override city if allowcityoverride is true.
+ */
 export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
+  // A ref to the container div, if needed for future usage
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Destructure the relevant props
   const { city, allowcityoverride, mobileview } = props;
 
-  // Figure out if we are in "mobile" mode
+  /**
+   * Decide if we're in "mobile" mode based on prop.
+   * The prop can be "true" (string), "false" (string), or a boolean.
+   */
   const isMobileView =
     mobileview === "true" ? true : mobileview === "false" ? false : Boolean(mobileview);
 
+  /**
+   * Decide if city override is allowed similarly.
+   */
   const isCityOverrideAllowed =
     allowcityoverride === "true"
       ? true
@@ -124,45 +162,60 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       ? false
       : Boolean(allowcityoverride);
 
-  // State
+  // Various pieces of state for weather info
   const [condition, setCondition] = useState<string>("Loading...");
   const [iconUrl, setIconUrl] = useState<string>("");
   const [temperatureC, setTemperatureC] = useState<number | null>(null);
   const [temperatureF, setTemperatureF] = useState<number | null>(null);
   const [isFahrenheit, setIsFahrenheit] = useState<boolean>(false);
-  const [localTime, setLocalTime] = useState<Date | null>(null);
+
+  // The "tz_id" from WeatherAPI (e.g., "America/New_York")
+  const [timeZone, setTimeZone] = useState<string>("");
+
+  // We'll store the current time (in that time zone) as a Luxon DateTime
+  const [localTime, setLocalTime] = useState<DateTime | null>(null);
+
+  // Loading state for the spinner overlay
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // State for city override popup
   const [overrideCity, setOverrideCity] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState<boolean>(false);
   const [overrideInput, setOverrideInput] = useState<string>("");
 
-  // Defaults
+  // Default fallback values, in case we can't fetch data
   const defaultCity = "New York City";
   const defaultCondition = "Patchy light snow";
   const defaultTemperatureC = 27;
   const defaultTemperatureF = (27 * 9) / 5 + 32;
 
-  // For icon path
-  const LOCAL_BASE = "./img";
+  // For icons
   const GITHUB_WEATHER_PATH =
     "https://eirastaffbase.github.io/weather-time/resources/img";
   const fallbackGHDefault = `${GITHUB_WEATHER_PATH}/default.svg`;
 
+  // Decide which city name to actually use (override or prop)
   const displayCity = overrideCity || city || defaultCity;
 
+  // Additional metadata from WeatherAPI (e.g., region/country)
   const [cityName, setCity] = useState<string>(displayCity);
   const [region, setRegion] = useState<string>("");
   const [country, setCountry] = useState<string>("");
 
-  // Fetch weather & time
+  /**
+   * Fetch weather from WeatherAPI, store temperature, condition, tz_id, etc.
+   * We rely on tz_id so that we can let Luxon handle the actual time in that zone.
+   */
   const fetchWeatherData = async () => {
     try {
+      // WeatherAPI key
       const apiKey = "2316f440769c440d92051647240512";
       if (!apiKey) {
         console.error("Weather API key is not set.");
-        return;
+        return null;
       }
 
+      // Build the URL
       const response = await fetch(
         `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(
           displayCity
@@ -171,137 +224,135 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
+
+      // Parse JSON
       const data = await response.json();
 
+      // Check if the response includes the necessary fields
       if (data && data.current && data.current.condition) {
-        setCondition(data.current.condition.text.toLowerCase());
+        // Temperatures (C and F)
         setTemperatureC(data.current.temp_c);
         setTemperatureF(data.current.temp_f);
+
+        // By default, set Fahrenheit if the country is "United States of America"
         setIsFahrenheit(data.location?.country === "United States of America");
 
+        // Figure out the correct weather icon to show
         const weatherCode = data.current.condition.code || 1000;
         const timeOfDay = data.current.is_day === 1 ? "day" : "night";
         const filename = getIconFilename(weatherCode, timeOfDay);
         setIconUrl(`${GITHUB_WEATHER_PATH}/${filename}`);
 
-        if (data.location?.localtime) {
-          setLocalTime(new Date(data.location.localtime));
+        // WeatherAPI also returns a tz_id, e.g. "America/New_York" or "Europe/London"
+        if (data.location?.tz_id) {
+          setTimeZone(data.location.tz_id);
         } else {
-          setLocalTime(new Date());
+          // fallback if missing
+          setTimeZone("UTC");
         }
 
+        // Store city/region/country for UI
         if (data.location) {
           setCity(data.location.name);
           setRegion(data.location.region);
           setCountry(data.location.country);
         }
 
-        return data.location; // return location data for time fetch
+        return data.location;
       } else {
+        // If invalid data, throw an error
         throw new Error("Invalid data received from weather API");
       }
     } catch (error) {
       console.error("Error fetching weather data:", error);
+
+      // Fallback to default weather if something goes wrong
       setCondition(defaultCondition.toLowerCase());
       setTemperatureC(defaultTemperatureC);
       setTemperatureF(defaultTemperatureF);
       setIsFahrenheit(false);
       setIconUrl(`${GITHUB_WEATHER_PATH}/default.svg`);
-      return null; // return null if weather fetch fails
+
+      // We'll just use UTC time as a fallback
+      setTimeZone("UTC");
+
+      return null;
     }
   };
 
-  const fetchTimeData = async (locationData: any) => {
-    if (!locationData || isMobileView) return; // Do not fetch if location or mobile
-
-    try {
-      const { lat, lon } = locationData;
-      const timeResponse = await fetch(
-        `https://timeapi.io/api/Time/current/coordinate?latitude=${encodeURIComponent(
-          lat
-        )}&longitude=${encodeURIComponent(lon)}`
-      );
-      if (timeResponse.ok) {
-        const timeData = await timeResponse.json();
-        if (timeData.dateTime) {
-          setLocalTime(new Date(timeData.dateTime));
-        } else {
-          setLocalTime(new Date());
-        }
-      } else {
-        setLocalTime(new Date());
-      }
-    } catch (error) {
-      console.error("Error fetching time data:", error);
-      setLocalTime(new Date()); // fallback to local time, but do not set weather to defaults
-    }
-  };
-
+  /**
+   * Helper function that calls `fetchWeatherData` and manages loading state
+   */
   const fetchWeatherAndTime = async () => {
     setIsLoading(true);
-    const locationData = await fetchWeatherData();
-    await fetchTimeData(locationData);
+    await fetchWeatherData();
     setIsLoading(false);
   };
 
+  /**
+   * When the component first mounts (and whenever `displayCity` changes),
+   * fetch the weather info for that city.
+   */
   useEffect(() => {
     fetchWeatherAndTime();
   }, [displayCity]);
 
-  // Start a live clock once localTime is set
-  const clockStartedRef = useRef(false);
+  /**
+   * Once we know the time zone, we can set the localTime using Luxon.
+   */
   useEffect(() => {
-    if (!localTime || clockStartedRef.current) return;
-    clockStartedRef.current = true;
+    if (!timeZone) return; // if no tz yet, do nothing
 
+    // Set the time right away
+    setLocalTime(DateTime.now().setZone(timeZone));
+
+    // Then, update once per minute
     const interval = setInterval(() => {
-      setLocalTime((prev) => {
-        if (!prev) return prev;
-        return new Date(prev.getTime() + 1000);
-      });
-    }, 1000);
+      setLocalTime(DateTime.now().setZone(timeZone));
+    }, 6000); 
 
-    return () => {
-      clearInterval(interval);
-      clockStartedRef.current = false;
-    };
-  }, [localTime]);
+    return () => clearInterval(interval);
+  }, [timeZone]);
 
-  // Refresh weather data every 10 minutes
-  useEffect(() => {
-    const weatherInterval = setInterval(() => {
-      fetchWeatherAndTime();
-    }, 600000); // 10 minutes
-    return () => clearInterval(weatherInterval);
-  }, []);
-
-  // Toggle temperature unit
+  /**
+   * Toggle between Celsius and Fahrenheit on click
+   */
   const toggleTemperatureUnit = () => {
     setIsFahrenheit((prev) => !prev);
   };
 
-  // Manual refresh on click
+  /**
+   * Manually refresh all weather/time data when user clicks something
+   */
   const handleRefresh = () => {
     fetchWeatherAndTime();
   };
 
-  // City override popup
+  /**
+   * Handle city override: user can type a new city and click "OK",
+   * then we store that city in state, and the effect above will re-fetch
+   */
   const handleSetCityOverride = () => {
     setOverrideCity(overrideInput.trim() || null);
     setShowPopup(false);
   };
 
-  // Current data for quick use
+  /**
+   * Decide which temperature to display (C or F)
+   */
   const temperature = isFahrenheit ? temperatureF : temperatureC;
-  const dateTimeString = localTime
-    ? formatDateTime(localTime)
-    : formatDateTime(new Date());
 
-  // Container style differs for mobile vs. desktop
+  /**
+   * Format the localTime if available, or show a loading string
+   */
+  const dateTimeString = localTime ? formatDateTime(localTime) : "Loading time...";
+
+  /**
+   * Container style - different if in mobile vs. desktop layout
+   */
   const containerStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: isMobileView ? "column" : "row",
-    flexWrap: "nowrap",
     justifyContent: isMobileView ? "flex-end" : "space-between",
     alignItems: isMobileView ? "flex-end" : "flex-start",
     padding: "10px",
@@ -311,8 +362,11 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
 
   return (
     <div ref={containerRef} style={containerStyle}>
-      {/* Loading overlay */}
-      {isLoading && (
+      {/* 
+        Loading overlay (optional):
+        If you'd like to show a spinner while fetching, uncomment this block.
+      */}
+      {/* {isLoading && (
         <div
           style={{
             position: "absolute",
@@ -320,7 +374,9 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: isMobileView ? "rgba(255,255,255,0)" : "rgba(255,255,255,0.7)",
+            backgroundColor: isMobileView
+              ? "rgba(255,255,255,0)"
+              : "rgba(255,255,255,0.7)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -333,12 +389,17 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             style={{ width: "30px" }}
           />
         </div>
-      )}
+      )} */}
 
-      {/* MOBILE LAYOUT (if isMobileView) */}
+      {/* 
+        MOBILE LAYOUT
+        ------------------------------------------------------------------
+        If isMobileView is true, we show icon first, then temperature,
+        and skip showing the time. (Though you could easily adjust if you want.)
+      */}
       {isMobileView && (
         <>
-          {/* Weather Icon first */}
+          {/* Weather Icon */}
           {iconUrl && (
             <div
               style={{ marginBottom: "10px", cursor: "pointer" }}
@@ -350,6 +411,8 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 style={{ width: "105px" }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
+                  // If the icon fails to load from the standard path,
+                  // attempt a fallback from GitHub, then a default icon
                   if (!imgEl.dataset.fallback) {
                     imgEl.dataset.fallback = "true";
                     const filenameFromLocalPath = iconUrl.split("/").pop();
@@ -365,14 +428,14 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             </div>
           )}
 
-          {/* Temperature next (stacked below icon), no date */}
+          {/* Temperature (C or F) */}
           {temperature !== null && (
             <p
               onClick={toggleTemperatureUnit}
               style={{
                 cursor: "pointer",
                 fontSize: "26px",
-                fontWeight: "600",
+                fontWeight: "500",
                 margin: "0px 15px 0px 0px",
               }}
             >
@@ -382,11 +445,17 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </>
       )}
 
-      {/* DESKTOP LAYOUT (if NOT isMobileView) */}
+      {/* 
+        DESKTOP LAYOUT
+        ------------------------------------------------------------------
+        If NOT mobileView, we show time and temperature side by side,
+        with the weather icon on the right.
+      */}
       {!isMobileView && (
         <>
-          {/* Left block: Temperature & date/time */}
+          {/* Left side: Temperature & date/time */}
           <div style={{ marginBottom: 0 }}>
+            {/* Temperature */}
             {temperature !== null && (
               <p
                 onClick={toggleTemperatureUnit}
@@ -400,7 +469,8 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
               </p>
             )}
-            {/* Show date/time in desktop only */}
+
+            {/* Show date/time (no seconds in the format) */}
             <p
               onClick={handleRefresh}
               style={{ fontSize: "16px", margin: "0 0 10px 0" }}
@@ -409,7 +479,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
             </p>
           </div>
 
-          {/* Weather Icon on the right */}
+          {/* Right side: Weather icon */}
           {iconUrl && (
             <div
               style={{
@@ -426,6 +496,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 style={{ width: "165px", marginTop: "-60px", marginLeft: "-5px" }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
+                  // fallback icon logic, just like above
                   if (!imgEl.dataset.fallback) {
                     imgEl.dataset.fallback = "true";
                     const filenameFromLocalPath = iconUrl.split("/").pop();
@@ -443,7 +514,9 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </>
       )}
 
-      {/* "..." button for city override */}
+      {/* 
+        OPTIONAL "..." button to open a city override popup if allowed
+      */}
       {isCityOverrideAllowed && (
         <div
           onClick={() => setShowPopup(true)}
@@ -459,7 +532,10 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </div>
       )}
 
-      {/* Popup for city override */}
+      {/* 
+        City override popup:
+        Lets user type in a different city name, e.g. "London", "Paris", etc.
+      */}
       {showPopup && (
         <div
           style={{
