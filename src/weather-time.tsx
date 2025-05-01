@@ -35,7 +35,7 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
     case 1030:
     case 1135:
     case 1147:
-      return "mist.svg";
+      return "double-clouds.svg";
     case 1063:
     case 1072:
     case 1150:
