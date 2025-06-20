@@ -27,6 +27,7 @@ const widgetAttributes: string[] = [
   'city',
   'allowcityoverride',
   'mobileview',
+  'usenewimages',
 ];
 
 /**

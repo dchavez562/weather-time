@@ -92,17 +92,17 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
  */
 function formatDateTime(dt: DateTime): string {
   // Example: dt.toFormat("LLL") => short month name like "Nov"
-  const monthShort = dt.toFormat("LLL"); 
+  const monthShort = dt.toFormat("LLL");
   // The numeric day of the month, e.g. 26
-  const day = dt.day; 
+  const day = dt.day;
   // 24-hour value; we'll convert to 12-hour below.
-  const hours24 = dt.hour; 
+  const hours24 = dt.hour;
   // Convert to 12-hour format (1-12)
-  const hours12 = hours24 % 12 || 12; 
+  const hours12 = hours24 % 12 || 12;
   // Get the minutes
-  const minutes = dt.minute; 
+  const minutes = dt.minute;
   // AM/PM check
-  const ampm = hours24 >= 12 ? "pm" : "am"; 
+  const ampm = hours24 >= 12 ? "pm" : "am";
 
   // For ordinal suffix (st, nd, rd, th),
   // e.g. 1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc.
@@ -125,9 +125,10 @@ function formatDateTime(dt: DateTime): string {
  * The React component properties
  */
 export interface WeatherTimeProps extends BlockAttributes {
-  city: string;              // The city for which to display weather/time
-  allowcityoverride: boolean; 
+  city: string; // The city for which to display weather/time
+  allowcityoverride: boolean;
   mobileview: boolean;
+  usenewimages: boolean;
 }
 
 /**
@@ -143,7 +144,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Destructure the relevant props
-  const { city, allowcityoverride, mobileview } = props;
+  const { city, allowcityoverride, mobileview, usenewimages } = props;
 
   /**
    * Decide if we're in "mobile" mode based on prop.
@@ -189,11 +190,18 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   const defaultTemperatureC = 27;
   const defaultTemperatureF = (27 * 9) / 5 + 32;
 
-  // For icons
+  // For icons - Define both potential paths
   const GITHUB_WEATHER_PATH =
     "https://eirastaffbase.github.io/weather-time/resources/img";
-  const fallbackGHDefault = `${GITHUB_WEATHER_PATH}/default.svg`;
+  const WIDGET_IMAGES_PATH =
+    "https://eirastaffbase.github.io/widget-images/weather-time";
 
+  const useNewImagesParsed = usenewimages === true || usenewimages === "true";
+
+  const imageBasePath = useNewImagesParsed ? WIDGET_IMAGES_PATH : GITHUB_WEATHER_PATH;
+
+  // Set the default fallback icon using the selected base path
+  const fallbackGHDefault = `${imageBasePath}/default.svg`;
   // Decide which city name to actually use (override or prop)
   const displayCity = overrideCity || city || defaultCity;
 
@@ -241,7 +249,8 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         const weatherCode = data.current.condition.code || 1000;
         const timeOfDay = data.current.is_day === 1 ? "day" : "night";
         const filename = getIconFilename(weatherCode, timeOfDay);
-        setIconUrl(`${GITHUB_WEATHER_PATH}/${filename}`);
+        // Use the dynamically selected imageBasePath
+        setIconUrl(`${imageBasePath}/${filename}`);
 
         // WeatherAPI also returns a tz_id, e.g. "America/New_York" or "Europe/London"
         if (data.location?.tz_id) {
@@ -260,7 +269,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
 
         return data.location;
       } else {
-        // If invalid data, throw an error
+        // If invalid data, throw an Error
         throw new Error("Invalid data received from weather API");
       }
     } catch (error) {
@@ -271,7 +280,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       setTemperatureC(defaultTemperatureC);
       setTemperatureF(defaultTemperatureF);
       setIsFahrenheit(false);
-      setIconUrl(`${GITHUB_WEATHER_PATH}/default.svg`);
+      setIconUrl(`${imageBasePath}/default.svg`);
 
       // We'll just use UTC time as a fallback
       setTimeZone("UTC");
@@ -295,6 +304,8 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
    */
   useEffect(() => {
     fetchWeatherAndTime();
+    console.log(usenewimages);
+    console.log(imageBasePath);
   }, [displayCity]);
 
   /**
@@ -309,7 +320,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
     // Then, update once per minute
     const interval = setInterval(() => {
       setLocalTime(DateTime.now().setZone(timeZone));
-    }, 6000); 
+    }, 6000);
 
     return () => clearInterval(interval);
   }, [timeZone]);
@@ -360,10 +371,13 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
     textAlign: isMobileView ? "right" : "left",
   };
 
+  // Determine the image width based on useNewImagesParsed
+  const imageWidthMobile = useNewImagesParsed ? "150px" : "105px";
+  const imageWidthDesktop = useNewImagesParsed ? "200px" : "165px";
+
   return (
     <div ref={containerRef} style={containerStyle}>
-      {/* 
-        Loading overlay (optional):
+      {/* Loading overlay (optional):
         If you'd like to show a spinner while fetching, uncomment this block.
       */}
       {/* {isLoading && (
@@ -391,8 +405,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </div>
       )} */}
 
-      {/* 
-        MOBILE LAYOUT
+      {/* MOBILE LAYOUT
         ------------------------------------------------------------------
         If isMobileView is true, we show icon first, then temperature,
         and skip showing the time. (Though you could easily adjust if you want.)
@@ -408,7 +421,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
               <img
                 src={iconUrl}
                 alt="Weather Icon"
-                style={{ width: "105px" }}
+                style={{ width: imageWidthMobile }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
                   // If the icon fails to load from the standard path,
@@ -416,7 +429,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                   if (!imgEl.dataset.fallback) {
                     imgEl.dataset.fallback = "true";
                     const filenameFromLocalPath = iconUrl.split("/").pop();
-                    imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
+                    imgEl.src = `${imageBasePath}/${filenameFromLocalPath}`;
                   } else if (!imgEl.dataset.fallback2) {
                     imgEl.dataset.fallback2 = "true";
                     imgEl.src = fallbackGHDefault;
@@ -445,8 +458,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </>
       )}
 
-      {/* 
-        DESKTOP LAYOUT
+      {/* DESKTOP LAYOUT
         ------------------------------------------------------------------
         If NOT mobileView, we show time and temperature side by side,
         with the weather icon on the right.
@@ -493,14 +505,14 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 src={iconUrl}
                 onClick={handleRefresh}
                 alt="Weather Icon"
-                style={{ width: "165px", marginTop: "-60px", marginLeft: "-5px" }}
+                style={{ width: imageWidthDesktop, marginTop: "-60px", marginLeft: "-5px" }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
                   // fallback icon logic, just like above
                   if (!imgEl.dataset.fallback) {
                     imgEl.dataset.fallback = "true";
                     const filenameFromLocalPath = iconUrl.split("/").pop();
-                    imgEl.src = `${GITHUB_WEATHER_PATH}/${filenameFromLocalPath}`;
+                    imgEl.src = `${imageBasePath}/${filenameFromLocalPath}`;
                   } else if (!imgEl.dataset.fallback2) {
                     imgEl.dataset.fallback2 = "true";
                     imgEl.src = fallbackGHDefault;
@@ -514,8 +526,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </>
       )}
 
-      {/* 
-        OPTIONAL "..." button to open a city override popup if allowed
+      {/* OPTIONAL "..." button to open a city override popup if allowed
       */}
       {isCityOverrideAllowed && (
         <div
@@ -532,8 +543,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
         </div>
       )}
 
-      {/* 
-        City override popup:
+      {/* City override popup:
         Lets user type in a different city name, e.g. "London", "Paris", etc.
       */}
       {showPopup && (

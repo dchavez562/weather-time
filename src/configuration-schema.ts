@@ -34,7 +34,13 @@ export const configurationSchema: JSONSchema7 = {
       type: "boolean",
       title: "Mobile view",
       default: false,
-    }
+    },
+    usenewimages: {
+      type: "boolean",
+      title: "Use new images?",
+      default: false,
+      description: "Use the new weather icons instead of the old ones.",
+    },
   },
   required: ['city'],
 };
@@ -54,6 +60,10 @@ export const uiSchema: UiSchema = {
   mobileview: {
     "ui:help":
       "Hide the date and time to simplify the widget for mobile.",
+  },
+  usenewimages: {
+    "ui:help":
+      "Use the new weather icons instead of the old ones. This will be the default in the future.",
   },
 
 };
