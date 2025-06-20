@@ -471,7 +471,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       {!isMobileView && (
         <>
           {/* Left side: Temperature & date/time */}
-          <div style={{ marginBottom: 0 }}>
+          <div style={{ marginBottom: useNewImagesParsed ? "-15px" : "0px" }}>
             {/* Temperature */}
             {temperature !== null && (
               <p
