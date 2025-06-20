@@ -372,8 +372,8 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   };
 
   // Determine the image width based on useNewImagesParsed
-  const imageWidthMobile = useNewImagesParsed ? "150px" : "105px";
-  const imageWidthDesktop = useNewImagesParsed ? "200px" : "165px";
+  const imageWidthMobile = useNewImagesParsed ? "130px" : "105px";
+  const imageWidthDesktop = useNewImagesParsed ? "230px" : "165px";
 
   return (
     <div ref={containerRef} style={containerStyle}>
@@ -415,14 +415,19 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
           {/* Weather Icon */}
           {iconUrl && (
             <div
-              style={{ marginBottom: "10px", cursor: "pointer" }}
+              style={{ 
+                marginBottom: useNewImagesParsed ? "0px" : "10px", 
+                cursor: "pointer",
+              }}
               onClick={handleRefresh}
             >
               <img
                 src={iconUrl}
                 alt="Weather Icon"
-                style={{ width: imageWidthMobile }}
-                onError={(e) => {
+                style={{
+                  width: imageWidthMobile,
+                }}
+                              onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
                   // If the icon fails to load from the standard path,
                   // attempt a fallback from GitHub, then a default icon
@@ -449,7 +454,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 cursor: "pointer",
                 fontSize: "26px",
                 fontWeight: "500",
-                margin: "0px 15px 0px 0px",
+                margin: useNewImagesParsed ? "0px 30px 0px 0px" : "0px 15px 0px 0px",
               }}
             >
               {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
@@ -505,7 +510,10 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 src={iconUrl}
                 onClick={handleRefresh}
                 alt="Weather Icon"
-                style={{ width: imageWidthDesktop, marginTop: "-60px", marginLeft: "-5px" }}
+                style={{ width: imageWidthDesktop, 
+                  marginTop: useNewImagesParsed ? "-65px" : "-60px",
+                  marginLeft: useNewImagesParsed ? "-40px" : "-5px",
+                              }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
                   // fallback icon logic, just like above
