@@ -454,7 +454,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 cursor: "pointer",
                 fontSize: "26px",
                 fontWeight: "500",
-                margin: useNewImagesParsed ? "0px 30px 0px 0px" : "0px 15px 0px 0px",
+                margin: useNewImagesParsed ? "0px 33px 0px 0px" : "0px 15px 0px 0px",
               }}
             >
               {Math.round(temperature)}°{isFahrenheit ? "F" : "C"}
@@ -512,7 +512,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
                 alt="Weather Icon"
                 style={{ width: imageWidthDesktop, 
                   marginTop: useNewImagesParsed ? "-65px" : "-60px",
-                  marginLeft: useNewImagesParsed ? "-40px" : "-5px",
+                  marginLeft: useNewImagesParsed ? "-10px" : "-5px",
                               }}
                 onError={(e) => {
                   const imgEl = e.currentTarget as HTMLImageElement;
