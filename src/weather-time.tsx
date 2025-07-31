@@ -141,10 +141,25 @@ export interface WeatherTimeProps extends BlockAttributes {
  * 4) (Optional) allow user to override city if allowcityoverride is true.
  */
 export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
+  console.log("WeatherTime props received:", props);
+  console.log("WeatherTime props keys:", Object.keys(props));
   // A ref to the container div, if needed for future usage
   const containerRef = useRef<HTMLDivElement>(null);
   // Destructure the relevant props
-
+  const { 
+    city = '', 
+    apikey = '', 
+    allowcityoverride = true, 
+    mobileview = false, 
+    usenewimages = false 
+  } = props;
+  console.log("After destructuring:", {
+    city,
+    apikey: apikey ? 'PROVIDED' : 'MISSING',
+    allowcityoverride,
+    mobileview,
+    usenewimages
+  });
   /**
    * Decide if we're in "mobile" mode based on prop.
    * The prop can be "true" (string), "false" (string), or a boolean.
