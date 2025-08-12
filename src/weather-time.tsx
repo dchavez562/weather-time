@@ -88,9 +88,9 @@ function getIconFilename(code: number, timeOfDay: "day" | "night"): string {
 
 /**
  * Format a Luxon DateTime object into a short string, e.g.:
- * "Nov 26th, 9:05am"
+ * "Nov 26th, 9:05am" or "Nov 26, 9:05am" (depending on showSuffix)
  */
-function formatDateTime(dt: DateTime): string {
+function formatDateTime(dt: DateTime, showSuffix: boolean = true): string {
   // Example: dt.toFormat("LLL") => short month name like "Nov"
   const monthShort = dt.toFormat("LLL");
   // The numeric day of the month, e.g. 26
@@ -112,7 +112,7 @@ function formatDateTime(dt: DateTime): string {
     if (n % 10 === 3 && n % 100 !== 13) return "rd";
     return "th";
   }
-  const suffix = getOrdinalSuffix(day);
+  const suffix = showSuffix ? getOrdinalSuffix(day) : "";
 
   // Pad minutes to 2 digits (e.g., "05" if it's 5 minutes after the hour)
   const minStr = minutes.toString().padStart(2, "0");
@@ -130,6 +130,7 @@ export interface WeatherTimeProps extends BlockAttributes {
   allowcityoverride: boolean;
   mobileview: boolean;
   usenewimages: boolean;
+  showordinalsuffix: boolean; // Whether to show ordinal suffixes in the date
 }
 
 /**
@@ -151,14 +152,16 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
     apikey = '', 
     allowcityoverride = true, 
     mobileview = false, 
-    usenewimages = false 
+    usenewimages = false,
+    showordinalsuffix = true
   } = props;
   console.log("After destructuring:", {
     city,
     apikey: apikey ? 'PROVIDED' : 'MISSING',
     allowcityoverride,
     mobileview,
-    usenewimages
+    usenewimages,
+    showordinalsuffix
   });
   /**
    * Decide if we're in "mobile" mode based on prop.
@@ -176,6 +179,16 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
       : allowcityoverride === "false"
       ? false
       : Boolean(allowcityoverride);
+
+  /**
+   * Decide if ordinal suffix should be shown similarly.
+   */
+  const shouldShowOrdinalSuffix =
+    showordinalsuffix === "true"
+      ? true
+      : showordinalsuffix === "false"
+      ? false
+      : Boolean(showordinalsuffix);
 
   // Various pieces of state for weather info
   const [condition, setCondition] = useState<string>("Loading...");
@@ -369,7 +382,7 @@ export const WeatherTime = (props: WeatherTimeProps): ReactElement => {
   /**
    * Format the localTime if available, or show a loading string
    */
-  const dateTimeString = localTime ? formatDateTime(localTime) : "Loading time...";
+  const dateTimeString = localTime ? formatDateTime(localTime, shouldShowOrdinalSuffix) : "Loading time...";
 
   /**
    * Container style - different if in mobile vs. desktop layout

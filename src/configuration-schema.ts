@@ -46,6 +46,12 @@ export const configurationSchema: JSONSchema7 = {
       default: false,
       description: "Use the new weather icons instead of the old ones.",
     },
+    showordinalsuffix: {
+      type: "boolean",
+      title: "Show ordinal suffix",
+      default: true,
+      description: "If checked, the date will show the ordinal suffix (e.g. '1st', '2nd', '3rd', '4th').",
+    },
   },
   required: ['city'],
 };
@@ -72,6 +78,10 @@ export const uiSchema: UiSchema = {
   usenewimages: {
     "ui:help":
       "Use the new weather icons instead of the old ones. This will be the default in the future.",
+  },
+  showordinalsuffix: {
+    "ui:help":
+      "If checked, the date will show the ordinal suffix (e.g. '1st', '2nd', '3rd', '4th').",
   },
 
 };
